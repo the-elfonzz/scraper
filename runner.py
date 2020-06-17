@@ -1,34 +1,40 @@
 import os
 import argparse
-from multiprocessing import Pool
-import subprocess
+from multiprocessing import Pool, Process
+import multiprocessing
+# import subprocess
+import logging
 
 import bbc
 import apnews
 import reuters
 
 
-bbc = bbc.Agent()
-apnews = apnews.Agent()
-reuters = reuters.Agent()
 SOURCES = [bbc, apnews, reuters]
 
-# def run(func):
-#     dirname = os.path.dirname(os.path.abspath(__file__))
-#     subprocess.call(os.path.join(dirname, func+'.py'))
 
-
-def run(sources):
-    for source in sources:
-        if source in SOURCES:
-            print(sources)
-
-# print(reuters.get_articles())
-# run(script)
+def run(source):
+    p = source().get_articles()
+    print(f'Start "{p}" task!')
 
 
 if __name__ == '__main__':
+    procs = []
+    multiprocessing.log_to_stderr()
+    logger = multiprocessing.get_logger()
+    logger.setLevel(logging.INFO)
     parser = argparse.ArgumentParser()
-    parser.add_argument('-s', '--sources', type=str, nargs='+', help='Pass source name/s')
+    parser.add_argument('-s', '--sources', type=str, nargs='+', help='add source "bbc", "appnews" or "reuters"')
     args = parser.parse_args()
-    run(args.sources)
+    pool = Pool(processes=len(args.sources))
+    try:
+        for source in SOURCES:
+            if source.__name__ in args.sources:
+                print(source.__name__)
+                result = pool.apply_async(run, args=(source.Agent,))
+                print(result.get(timeout=180))
+                pool.close()
+                pool.join()
+    except Exception as exception:
+        print(f'Critical Error: {exception}')
+        raise SystemExit(1)
